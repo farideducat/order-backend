@@ -1,15 +1,40 @@
+// ===============================
+// Imports & Config
+// ===============================
 const express = require("express");
+const app = express();
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-const app = express();
-
+// ===============================
 // Middleware
+// ===============================
 app.use(express.json());
-app.use(cors());
 
-// Nodemailer transporter
+// Allow only your GitHub Pages frontend
+const allowedOrigins = [
+  "https://farideducat.github.io",
+  "https://farideducat.github.io/partsStore"
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
+};
+
+app.use(cors(corsOptions));
+
+// ===============================
+// Nodemailer Setup
+// ===============================
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -18,7 +43,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Root route (for testing)
+// ===============================
+// Routes
+// ===============================
+
+// Test route
 app.get("/", (req, res) => {
   res.send("✅ Backend is running!");
 });
@@ -27,39 +56,72 @@ app.get("/", (req, res) => {
 app.post("/send-email", async (req, res) => {
   const { name, email, phone, address, orderItems, subtotal, shipping, total } = req.body;
 
-  // ✅ Admin email
+  // ✅ Email for Admin (store owner)
   const adminHtml = `
     <h2>📦 New Order Received</h2>
     <p><b>Name:</b> ${name}</p>
     <p><b>Email:</b> ${email}</p>
-    <p><b>Phone:</b> ${phone || "N/A"}</p>
+    <p><b>Phone:</b> ${phone}</p>
     <p><b>Address:</b> ${address}</p>
-    <h3>Order Summary</h3>
-    <ul>
-      ${orderItems.map((item) => `<li>${item.name} x${item.quantity} - OMR ${item.price.toFixed(2)}</li>`).join("")}
-    </ul>
+    <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Price (OMR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${orderItems
+          .map(
+            (item) => `
+          <tr>
+            <td>${item.name}</td>
+            <td>${item.quantity}</td>
+            <td>${item.price.toFixed(2)}</td>
+          </tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>
     <p><b>Subtotal:</b> OMR ${subtotal.toFixed(2)}</p>
     <p><b>Shipping:</b> OMR ${shipping.toFixed(2)}</p>
     <p><b>Total:</b> OMR ${total.toFixed(2)}</p>
   `;
 
-  // ✅ Customer email
+  // ✅ Email for Customer
   const customerHtml = `
-    <h2>✅ Order Confirmation</h2>
-    <p>Dear ${name},</p>
-    <p>Thank you for your order with <b>Farid Express</b>! 🎉</p>
-    <p><b>Order Details:</b></p>
-    <ul>
-      ${orderItems.map((item) => `<li>${item.name} x${item.quantity} - OMR ${item.price.toFixed(2)}</li>`).join("")}
-    </ul>
+    <h2>✅ Thank you for your order, ${name}!</h2>
+    <p>We have received your order. Here are the details:</p>
+    <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Price (OMR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${orderItems
+          .map(
+            (item) => `
+          <tr>
+            <td>${item.name}</td>
+            <td>${item.quantity}</td>
+            <td>${item.price.toFixed(2)}</td>
+          </tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>
+    <p><b>Subtotal:</b> OMR ${subtotal.toFixed(2)}</p>
+    <p><b>Shipping:</b> OMR ${shipping.toFixed(2)}</p>
     <p><b>Total:</b> OMR ${total.toFixed(2)}</p>
-    <p>📍 Shipping Address: ${address}</p>
-    <p>We’ll contact you soon regarding delivery 🚚</p>
-    <p>— Farid Express</p>
+    <p>📦 Your order is being processed. We’ll notify you once it’s shipped!</p>
   `;
 
   try {
-    // Send to Admin
+    // Send email to Admin (you)
     await transporter.sendMail({
       from: `"Farid Express Orders" <${process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER,
@@ -67,7 +129,7 @@ app.post("/send-email", async (req, res) => {
       html: adminHtml,
     });
 
-    // Send to Customer
+    // Send confirmation to Customer
     await transporter.sendMail({
       from: `"Farid Express" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -82,8 +144,10 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-// Start server
+// ===============================
+// Start Server
+// ===============================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`✅ Server is running on port ${PORT}`);
 });
