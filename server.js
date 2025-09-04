@@ -5,7 +5,6 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const nodemailer = require("nodemailer");
-const mongoose = require("mongoose");
 require("dotenv").config();
 
 // ===============================
@@ -34,36 +33,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // ===============================
-// MongoDB Connection
-// ===============================
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch(err => console.error("❌ MongoDB Connection Error:", err));
-
-// ===============================
-// Order Schema
-// ===============================
-const orderSchema = new mongoose.Schema({
-  name: String,
-  email: String,
-  phone: String,
-  address: String,
-  orderItems: [
-    {
-      name: String,
-      quantity: Number,
-      price: Number,
-    },
-  ],
-  subtotal: Number,
-  shipping: Number,
-  total: Number,
-  createdAt: { type: Date, default: Date.now },
-});
-
-const Order = mongoose.model("Order", orderSchema);
-
-// ===============================
 // Nodemailer Setup
 // ===============================
 const transporter = nodemailer.createTransport({
@@ -80,14 +49,14 @@ const transporter = nodemailer.createTransport({
 
 // Test route
 app.get("/", (req, res) => {
-  res.send("✅ Backend is running with MongoDB!");
+  res.send("✅ Backend is running!");
 });
 
-// Send email + save order
+// Send email route
 app.post("/send-email", async (req, res) => {
   const { name, email, phone, address, orderItems, subtotal, shipping, total } = req.body;
 
-  // ✅ Email for Admin
+  // ✅ Email for Admin (store owner)
   const adminHtml = `
     <h2>📦 New Order Received</h2>
     <p><b>Name:</b> ${name}</p>
@@ -103,12 +72,16 @@ app.post("/send-email", async (req, res) => {
         </tr>
       </thead>
       <tbody>
-        ${orderItems.map(item => `
+        ${orderItems
+          .map(
+            (item) => `
           <tr>
             <td>${item.name}</td>
             <td>${item.quantity}</td>
             <td>${item.price.toFixed(2)}</td>
-          </tr>`).join("")}
+          </tr>`
+          )
+          .join("")}
       </tbody>
     </table>
     <p><b>Subtotal:</b> OMR ${subtotal.toFixed(2)}</p>
@@ -129,12 +102,16 @@ app.post("/send-email", async (req, res) => {
         </tr>
       </thead>
       <tbody>
-        ${orderItems.map(item => `
+        ${orderItems
+          .map(
+            (item) => `
           <tr>
             <td>${item.name}</td>
             <td>${item.quantity}</td>
             <td>${item.price.toFixed(2)}</td>
-          </tr>`).join("")}
+          </tr>`
+          )
+          .join("")}
       </tbody>
     </table>
     <p><b>Subtotal:</b> OMR ${subtotal.toFixed(2)}</p>
@@ -144,20 +121,7 @@ app.post("/send-email", async (req, res) => {
   `;
 
   try {
-    // ✅ Save order to MongoDB
-    const newOrder = new Order({
-      name,
-      email,
-      phone,
-      address,
-      orderItems,
-      subtotal,
-      shipping,
-      total,
-    });
-    await newOrder.save();
-
-    // ✅ Send email to Admin
+    // Send email to Admin (you)
     await transporter.sendMail({
       from: `"Farid Express Orders" <${process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER,
@@ -165,7 +129,7 @@ app.post("/send-email", async (req, res) => {
       html: adminHtml,
     });
 
-    // ✅ Send confirmation to Customer
+    // Send confirmation to Customer
     await transporter.sendMail({
       from: `"Farid Express" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -173,10 +137,10 @@ app.post("/send-email", async (req, res) => {
       html: customerHtml,
     });
 
-    res.json({ success: true, message: "Order saved & emails sent!" });
+    res.json({ success: true, message: "Order emails sent successfully!" });
   } catch (error) {
-    console.error("❌ Error:", error);
-    res.status(500).json({ success: false, message: "Failed to process order" });
+    console.error("❌ Error sending email:", error);
+    res.status(500).json({ success: false, message: "Failed to send email" });
   }
 });
 
