@@ -7,15 +7,22 @@ const cors = require("cors");
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-// ===============================
+//import product model
+const Product = require("./models/Product");
+
+const { default: mongoose } = require("mongoose");
+
 // Middleware
-// ===============================
+
 app.use(express.json());
 
 // Allow only your GitHub Pages frontend
 const allowedOrigins = [
   "https://farideducat.github.io",
-  "https://farideducat.github.io/partsStore"
+  "https://farideducat.github.io/partsStore",
+     "http://127.0.0.1:5500", 
+    "http://localhost:5500",
+     "https://order-backend-o09t.onrender.com" 
 ];
 
 const corsOptions = {
@@ -26,14 +33,24 @@ const corsOptions = {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type"]
 };
 
 app.use(cors(corsOptions));
 
+
+// mongoDB connection 
+
+mongoose.connect(process.env.MONGO_URL,{
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log("✅ MongoDB Connected"))
+.catch((err) => console.log("❌ MongoDB connection error:", err));
+
 // ===============================
-// Nodemailer Setup
+// Nodemailer Setup for order
 // ===============================
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -42,6 +59,9 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
 });
+
+
+
 
 // ===============================
 // Routes
@@ -52,6 +72,62 @@ app.get("/", (req, res) => {
   res.send("✅ Backend is running!");
 });
 
+
+  // product routs admin panel API
+
+  // add product
+
+  app.post("/api/product", async (req, res) => {
+    try{
+      const newProduct = new Product(req.body);
+      const savedProduct = await newProduct.save();
+      res.status(201).json(savedProduct);
+    }  catch (err) {
+      res.status(500).json({error: "Failed to add product", details: err.message });
+    }
+  })
+
+
+  //get all products
+
+  app.get("/api/product", async (req, res ) => {
+    try{ 
+    const products =  await Product.find();
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch products" });
+  }
+  });
+
+
+  //update product 
+  app.put("/api/product/:id", async (req, res) => {
+    try{
+      const updatedProduct = await Product.findByIdAndUpdate(
+        req.params.id,
+        req.body,
+        {new: true}
+      );
+      res.json(updatedProduct);
+    } catch(err) {
+      res.status(500).json({error: "Failed to update product"});
+    }
+  });
+
+
+
+  //deleted product
+
+  app.delete("/api/product/:id", async (req, res) => {
+    try{
+      await Product.findByIdAndDelete(req.params.id);
+      res.json({ message: "product deleted successfully"});
+    } catch (err) {
+      res.status(500).json({error: "failed to delete product"});
+    }
+  });
+
+   
 // Send email route
 app.post("/send-email", async (req, res) => {
   const { name, email, phone, address, orderItems, subtotal, shipping, total } = req.body;
